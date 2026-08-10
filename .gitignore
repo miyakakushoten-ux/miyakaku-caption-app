@@ -1,0 +1,4 @@
+.env
+history_images/
+posts_data.csv
+__pycache__/
