@@ -3,7 +3,7 @@ import pandas as pd
 import google.generativeai as genai
 import os
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from PIL import Image
 import json
 import gspread
@@ -197,7 +197,8 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
         with st.spinner("MIYAKAKU LEATHERの魂を込めた文章を生成中..."):
             
             # 現在の日付を取得して季節感を演出
-            today_str = datetime.now().strftime("%Y年%m月%d日")
+            jst_now = datetime.now(timezone(timedelta(hours=9)))
+            today_str = jst_now.strftime("%Y年%m月%d日")
 
             # AIに渡す「完璧なプロンプト（指示書）」の組み立て
             system_prompt = f"""
@@ -277,7 +278,7 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
                 # 1. ローカルのCSVへ保存（バックアップ）
                 history_df = load_history()
                 new_data = pd.DataFrame([{
-                    "日時": datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
+                    "日時": jst_now.strftime("%Y/%m/%d %H:%M:%S"),
                     "シリーズ": selected_series,
                     "テーマ・商品": theme_input,
                     "長さ": {1: "短め", 2: "普通", 3: "長め"}[length_slider],
@@ -301,7 +302,7 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
                     
                     # データの追加
                     sheet.append_row([
-                        datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
+                        jst_now.strftime("%Y/%m/%d %H:%M:%S"),
                         selected_series,
                         theme_input,
                         {1: "短め", 2: "普通", 3: "長め"}[length_slider],
