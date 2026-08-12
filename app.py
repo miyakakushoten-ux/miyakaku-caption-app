@@ -5,6 +5,9 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 from PIL import Image
+import json
+import gspread
+from google.oauth2.service_account import Credentials
 
 # 1. 環境変数の読み込み（.envファイルからAPIキーを取得）
 load_dotenv()
@@ -56,6 +59,26 @@ IMAGE_DIR = "history_images"
 # 写真保存用のフォルダがなければ自動作成する
 if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
+
+# --- ここから追加：Google Drive & Sheets 認証設定 ---
+def get_gcp_credentials():
+    # スプレッドシートの操作と、ファイル名検索のためのドライブ権限を指定
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    creds_path = os.path.join(".streamlit", "credentials.json")
+    
+    # パターン1: ローカルPCの場合（credentials.jsonが存在する）
+    if os.path.exists(creds_path):
+        return Credentials.from_service_account_file(creds_path, scopes=scopes)
+    
+    # パターン2: クラウド（本番環境）の場合（Streamlitの金庫から読み込む）
+    else:
+        creds_dict = json.loads(st.secrets["gcp_service_account_json"])
+        return Credentials.from_service_account_info(creds_dict, scopes=scopes)
+# --- 追加ここまで ---
 
 def load_history():
     if os.path.exists(CSV_FILE):
@@ -236,11 +259,14 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
                 # 画像の保存処理（複数枚対応）
                 saved_image_paths = []
                 current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
                 if uploaded_files:
                     for i, f in enumerate(uploaded_files):
                         ext = f.name.split(".")[-1]
-                        # 複数枚あるため、ファイル名末尾に連番(_0, _1...)を付与
-                        path = os.path.join(IMAGE_DIR, f"image_{current_time_str}_{i}.{ext}")
+                        file_name = f"image_{current_time_str}_{i}.{ext}"
+                        
+                        # ローカルへ保存
+                        path = os.path.join(IMAGE_DIR, file_name)
                         img_data = Image.open(f)
                         img_data.save(path)
                         saved_image_paths.append(path)
@@ -248,7 +274,7 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
                 # パスのリストをカンマ区切りの文字列にして記録用にする
                 saved_image_path_str = ",".join(saved_image_paths)
 
-                # Pandasを使って履歴へ保存
+                # 1. ローカルのCSVへ保存（バックアップ）
                 history_df = load_history()
                 new_data = pd.DataFrame([{
                     "日時": datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
@@ -262,7 +288,29 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
                 history_df = pd.concat([new_data, history_df], ignore_index=True)
                 save_history(history_df)
                 
-                st.success("履歴と写真を保存しました！この文章をコピーして、Instagramへ投稿してください。")
+                # 2. スプレッドシートへ保存
+                with st.spinner("スプレッドシートへ履歴を書き込み中..."):
+                    creds = get_gcp_credentials()
+                    client = gspread.authorize(creds)
+                    # スプレッドシート「履歴」を開き、最初のシートを取得
+                    sheet = client.open("履歴").sheet1
+                    
+                    # スプレッドシートが空の場合はヘッダー（1行目）を自動追加
+                    if not sheet.get_all_values():
+                        sheet.append_row(["日時", "シリーズ", "テーマ・商品", "長さ", "濃度", "画像ファイル名", "生成キャプション"])
+                    
+                    # データの追加
+                    sheet.append_row([
+                        datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
+                        selected_series,
+                        theme_input,
+                        {1: "短め", 2: "普通", 3: "長め"}[length_slider],
+                        slider_labels[concept_slider],
+                        saved_image_path_str,
+                        generated_text
+                    ])
+                
+                st.success("履歴と画像ファイル名をスプレッドシートに保存しました！この文章をコピーして、Instagramへ投稿してください。")
 
             except Exception as e:
                 st.error(f"エラーが発生しました: {e}")
