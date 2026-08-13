@@ -44,6 +44,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# === バージョン（世代）管理の初期設定 ===
+# まだバージョン番号がなければ「1」をセットする
+if "reset_counter" not in st.session_state:
+    st.session_state.reset_counter = 1
+
 # 3. APIキーの設定確認
 if not api_key:
     st.error("APIキーが見つかりません。.envファイルに GEMINI_API_KEY が正しく設定されているか確認してください。")
@@ -109,7 +114,8 @@ series_options = {
 selected_series = st.selectbox(
     "1. シリーズを選択してください", 
     list(series_options.keys()),
-    help="【クラフトキャンバス】アート要素を取り入れたデザイン\n【モータークラフト】ライダー向け、耐久性と機能性\n【クラシックエレメンツ】伝統と革新のオーソドックススタイル"
+    help="【クラフトキャンバス】アート要素を取り入れたデザイン\n【モータークラフト】ライダー向け、耐久性と機能性\n【クラシックエレメンツ】伝統と革新のオーソドックススタイル",
+    key=f"input_series_{st.session_state.reset_counter}"
 )
 
 # --- UI: テーマ入力 ---
@@ -117,7 +123,8 @@ selected_series = st.selectbox(
 theme_input = st.text_area(
     "2. 今日の作業内容、アピールポイント", 
     placeholder="例：モータークラフトの新作バッグ。分厚い栃木レザーを手縫いで仕上げました。",
-    help="具体的な商品名や、今日行った作業（ステッチ、裁断など）、特にアピールしたいこだわりを入力してください。"
+    help="具体的な商品名や、今日行った作業（ステッチ、裁断など）、特にアピールしたいこだわりを入力してください。",
+    key=f"input_theme_{st.session_state.reset_counter}"
 )
 
 # --- UI: 画像アップロード ---
@@ -126,7 +133,8 @@ uploaded_files = st.file_uploader(
     "3. 写真をアップロード", 
     type=["jpg", "jpeg", "png"], 
     accept_multiple_files=True,
-    help="革の質感やステッチをAIに見せるための写真です。複数枚選択できます。"
+    help="革の質感やステッチをAIに見せるための写真です。複数枚選択できます。",
+    key=f"input_files_{st.session_state.reset_counter}"
 )
 if uploaded_files:
     cols = st.columns(len(uploaded_files))
@@ -147,7 +155,8 @@ with st.expander("⚙️ 詳細設定（文章の長さ・ブランド濃度）"
         "文章のボリューム",
         options=[1, 2, 3],
         format_func=lambda x: {1: "短め", 2: "普通", 3: "長め"}[x],
-        help="1:短め（挨拶中心） / 2:普通（適度なストーリー） / 3:長め（こだわりをじっくり読ませる）"
+        help="1:短め（挨拶中心） / 2:普通（適度なストーリー） / 3:長め（こだわりをじっくり読ませる）",
+        key=f"input_length_{st.session_state.reset_counter}"
     )
 
     concept_mapping = {
@@ -169,7 +178,8 @@ with st.expander("⚙️ 詳細設定（文章の長さ・ブランド濃度）"
         options=[1, 2, 3, 4, 5],
         value=3,
         format_func=lambda x: slider_labels[x],
-        help="右にいくほど、100年の歴史や3世代の職人魂といった熱いストーリーが濃く反映されます。"
+        help="右にいくほど、100年の歴史や3世代の職人魂といった熱いストーリーが濃く反映されます。",
+        key=f"input_concept_{st.session_state.reset_counter}"
     )
 
     # モデル選択も詳細設定の中に収納します
@@ -180,7 +190,12 @@ with st.expander("⚙️ 詳細設定（文章の長さ・ブランド濃度）"
         st.error(f"モデル一覧の取得に失敗しました: {e}")
 
     if valid_models:
-        selected_model = st.selectbox("使用するAIモデル", valid_models, help="通常は一番上のモデルをそのままご使用ください。")
+        selected_model = st.selectbox(
+            "使用するAIモデル", 
+            valid_models, 
+            help="通常は一番上のモデルをそのままご使用ください。",
+            key=f"input_model_{st.session_state.reset_counter}"
+        )
     else:
         st.warning("利用可能なAIモデルが見つかりません。")
         selected_model = None
@@ -315,6 +330,22 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
 
             except Exception as e:
                 st.error(f"エラーが発生しました: {e}")
+
+# --- ここから追加：リセットボタン ---
+st.markdown("<br>", unsafe_allow_html=True)
+
+# 記憶を完全に消去し、新しい世代（バージョン）に進める専用関数
+def reset_inputs():
+    # 今のバージョン番号を一時保存
+    current_counter = st.session_state.reset_counter
+    # 古い記憶をすべて消去（ここで古い写真データ等も消滅します）
+    st.session_state.clear()
+    # バージョン番号を+1して、新しい世代として再セット
+    st.session_state.reset_counter = current_counter + 1
+
+# on_clickでボタンが押された瞬間に世代交代を実行します
+st.button("🔄 入力内容をリセットして次の投稿を作る", use_container_width=True, on_click=reset_inputs)
+# --- 追加ここまで ---
 
 # ==========================================
 # 履歴の表示
