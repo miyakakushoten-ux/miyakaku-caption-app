@@ -119,14 +119,24 @@ selected_series = st.selectbox(
     key=f"input_series_{st.session_state.reset_counter}"
 )
 
-# --- UI: テーマ入力 ---
-# スマホで見たときに圧迫感がないよう、タイトルを短くしました
-theme_input = st.text_area(
-    "2. 今日の作業内容、アピールポイント", 
-    placeholder="例：モータークラフトの新作バッグ。分厚い栃木レザーを手縫いで仕上げました。",
-    help="具体的な商品名や、今日行った作業（ステッチ、裁断など）、特にアピールしたいこだわりを入力してください。",
-    key=f"input_theme_{st.session_state.reset_counter}"
+# --- UI: テーマ・スペック入力（Feature） ---
+theme_input_feature = st.text_area(
+    "2-1. 📝 今日の作業内容・商品のこだわり", 
+    placeholder="例：厚さ3mmの栃木レザーを使用。真鍮製のジャンパーホックを手打ちで固定しました。",
+    help="具体的な商品名、使用した素材、こだわりの技法など、作り手としての「事実とスペック」を入力してください。",
+    key=f"input_theme_feature_{st.session_state.reset_counter}"
 )
+
+# --- UI: ベネフィット入力（Benefit） ---
+theme_input_benefit = st.text_area(
+    "2-2. 💡 お客様のメリット（体験・使うシーン・悩みの解決）", 
+    placeholder="例：バイクのグローブをしたままでも片手で開け閉めできます。雨風に強く、高速道路のツーリングでもバタつきません。",
+    help="お客様がこれを使うことでどんな「良い体験」ができるか、どんなシーンで活躍するかを入力してください。",
+    key=f"input_theme_benefit_{st.session_state.reset_counter}"
+)
+
+# 保存用・履歴表示用に、入力内容を結合しておきます
+theme_input_save = f"【こだわり】\n{theme_input_feature}\n\n【体験・シーン】\n{theme_input_benefit}" if theme_input_benefit else theme_input_feature
 
 # --- UI: 画像アップロード ---
 # 頻繁に使う画像アップロードを上部に引き上げ、タイトルを短縮しました
@@ -207,8 +217,8 @@ with st.expander("⚙️ 詳細設定（文章の長さ・ブランド濃度）"
 
 # スマホで押しやすいように use_container_width=True を追加してボタンを画面幅いっぱいに広げます
 if st.button("✨ AIでキャプションを生成する", type="primary", use_container_width=True):
-    if not theme_input:
-        st.warning("「今日の作業内容、具体的な商品名、アピールしたいポイント」を入力してください。")
+    if not theme_input_feature:
+        st.warning("「今日の作業内容・商品のこだわり」を少なくとも入力してください。")
     else:
         with st.spinner("MIYAKAKU LEATHERの魂を込めた文章を生成中..."):
             
@@ -246,7 +256,12 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
 - 「サステナブル」でタイムレスな「技」と「デザイン」。
 {series_context}
 【ユーザーからの指示（具体的な商品やテーマ）】
-{theme_input}
+■作り手としての事実とこだわり:
+{theme_input_feature}
+
+■お客様への提供価値（体験・使うシーン・悩みの解決）:
+{theme_input_benefit}
+※上記のお客様へのメリットや使うシーンを、単なる機能説明ではなく、読者が実際に使っている情景を想像できるような魅力的な言葉でアピールしてください。
 
 【出力の条件】
 - トーン＆マナー: プロの革職人としての確かな技術や誇りは持ちつつも、工房を訪れたお客様に直接語りかけるような、親しみやすくあたたかい温度感（です・ます調）で書いてください。適度に絵文字も交えてください。
@@ -307,7 +322,7 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
                 new_data = pd.DataFrame([{
                     "日時": jst_now.strftime("%Y/%m/%d %H:%M:%S"),
                     "シリーズ": selected_series,
-                    "テーマ・商品": theme_input,
+                    "テーマ・商品": theme_input_save,
                     "長さ": {1: "短め", 2: "普通", 3: "長め"}[length_slider],
                     "濃度": slider_labels[concept_slider],
                     "画像パス": saved_image_path_str,
@@ -331,7 +346,7 @@ if st.button("✨ AIでキャプションを生成する", type="primary", use_c
                     sheet.append_row([
                         jst_now.strftime("%Y/%m/%d %H:%M:%S"),
                         selected_series,
-                        theme_input,
+                        theme_input_save,
                         {1: "短め", 2: "普通", 3: "長め"}[length_slider],
                         slider_labels[concept_slider],
                         saved_image_path_str,
